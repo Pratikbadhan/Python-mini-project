@@ -1,12 +1,13 @@
 import streamlit as st
 import random
 import os
+import json
 
-# --- TEACHER AUTHENTICATION & REGISTRATION (UNIT V FILE HANDLING) ---
+# --- TEACHER AUTHENTICATION & REGISTRATION (UNIT V) ---
 TEACHER_FILE = "teachers.txt"
 
 def load_teachers():
-    teachers = {"teacher": "admin123"}  # Default fallback account
+    teachers = {"teacher": "admin123"}
     if os.path.exists(TEACHER_FILE):
         try:
             with open(TEACHER_FILE, "r") as file:
@@ -17,7 +18,6 @@ def load_teachers():
         except Exception:
             pass
     else:
-        # Create default file if missing
         save_teacher_to_file("teacher", "admin123")
     return teachers
 
@@ -33,7 +33,7 @@ if "authenticated" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
 
-# --- AUTHENTICATION SCREEN (LOGIN / SIGN UP) ---
+# --- AUTHENTICATION SCREEN ---
 if not st.session_state.authenticated:
     st.set_page_config(page_title="Teacher Portal - Authentication", page_icon="🔐")
     st.title("🔐 Teacher Portal Authentication")
@@ -75,7 +75,7 @@ if not st.session_state.authenticated:
                 else:
                     save_teacher_to_file(new_user.strip(), new_pass.strip())
                     st.success("Registration successful! You can now switch to 'Login' above.")
-    st.stop()  # Halt execution until authenticated
+    st.stop()
 
 
 # --- SYLLABUS UNIT IV: OOPs Concepts (Inheritance & Data Hiding) ---
@@ -92,6 +92,15 @@ class Student(Person):
 
     def get_student_id(self):
         return self.__student_id
+
+    def set_name(self, name):
+        self._name = name
+
+    def set_age(self, age):
+        self._age = age
+
+    def set_subjects(self, subjects_dict):
+        self.__subjects = subjects_dict
 
     def get_name(self):
         return self._name
@@ -110,12 +119,35 @@ class Student(Person):
         return round((self.get_total_marks() / total_max) * 100, 2) if total_max > 0 else 0.0
 
     def to_file_format(self):
-        subj_values = ",".join(str(v) for v in self.__subjects.values())
-        return f"{self.__student_id},{self._name},{self._age},{subj_values}\n"
+        # Store as CSV with JSON string for subjects dictionary (Unit V)
+        subj_json = json.dumps(self.__subjects)
+        return f"{self.__student_id},{self._name},{self._age},{subj_json}\n"
 
 
-# --- SYLLABUS UNIT V: Text Files & Exception Handling ---
-STUDENT_FILE = "students_v2.txt"
+# --- SYLLABUS UNIT V: Text Files & Subject/Student Management ---
+SUBJECT_FILE = "subjects.txt"
+STUDENT_FILE = "students_v3.txt"
+
+def load_subjects():
+    default_subjects = ["Python Programming", "Data Structures", "Digital Logic", "Mathematics"]
+    if os.path.exists(SUBJECT_FILE):
+        try:
+            with open(SUBJECT_FILE, "r") as file:
+                subs = [line.strip() for line in file if line.strip()]
+                return subs if subs else default_subjects
+        except Exception:
+            return default_subjects
+    else:
+        save_subjects(default_subjects)
+        return default_subjects
+
+def save_subjects(subjects_list):
+    try:
+        with open(SUBJECT_FILE, "w") as file:
+            for sub in subjects_list:
+                file.write(f"{sub}\n")
+    except IOError as e:
+        st.error(f"Error saving subjects: {e}")
 
 def load_records():
     students = []
@@ -123,18 +155,13 @@ def load_records():
         try:
             with open(STUDENT_FILE, "r") as file:
                 for line in file:
-                    parts = line.strip().split(",")
-                    if len(parts) >= 7:
-                        s_id, name, age = int(parts[0]), parts[1], int(parts[2])
-                        subjects = {
-                            "Python": float(parts[3]),
-                            "Data Structures": float(parts[4]),
-                            "Digital Logic": float(parts[5]),
-                            "Mathematics": float(parts[6])
-                        }
+                    parts = line.strip().split(",", 3)
+                    if len(parts) == 4:
+                        s_id, name, age, subj_json = int(parts[0]), parts[1], int(parts[2]), parts[3]
+                        subjects = json.loads(subj_json)
                         students.append(Student(s_id, name, age, subjects))
         except Exception as e:
-            st.error(f"Error reading file: {e}")
+            st.error(f"Error reading records file: {e}")
     return students
 
 def save_records(students):
@@ -147,13 +174,15 @@ def save_records(students):
 
 
 # --- INITIALIZE SESSION STATE ---
+if "subjects" not in st.session_state:
+    st.session_state.subjects = load_subjects()
 if "students" not in st.session_state:
     st.session_state.students = load_records()
 
 
 # --- STREAMLIT DASHBOARD UI ---
 st.title("🎓 Student Record Management System")
-st.markdown(f"*Logged in as teacher: **{st.session_state.current_user}** | B.Tech Computer Science Mini-Project*")
+st.markdown(f"*Logged in as: **{st.session_state.current_user}** | B.Tech Computer Science Mini-Project*")
 st.divider()
 
 # Sidebar Navigation & Logout
@@ -161,6 +190,8 @@ st.sidebar.title("Navigation")
 menu = st.sidebar.radio("Go to", [
     "➕ Add Student & Marks", 
     "📋 View All Records", 
+    "✏️ Edit Student Record",
+    "📚 Manage Subjects",
     "🔍 Search by ID (Linear Search)", 
     "⭐ Filter High Achievers (Lambda)"
 ])
@@ -174,41 +205,39 @@ if st.sidebar.button("🔒 Logout"):
 
 # --- OPTION 1: ADD STUDENT ---
 if menu == "➕ Add Student & Marks":
-    st.subheader("Register New Student & Subject-wise Marks")
+    st.subheader("Register New Student & Subject Marks")
     
     if "suggested_id" not in st.session_state:
         st.session_state.suggested_id = random.randint(1001, 9999)
 
-    with st.form("add_form"):
-        s_id = st.number_input("Student ID", min_value=1, value=st.session_state.suggested_id)
-        name = st.text_input("Full Name")
-        age = st.number_input("Age", min_value=17, max_value=100, value=20)
-        
-        st.markdown("### Enter Marks (Out of 100)")
-        col1, col2 = st.columns(2)
-        with col1:
-            m_python = st.number_input("Python Programming", 0.0, 100.0, 80.0)
-            m_ds = st.number_input("Data Structures", 0.0, 100.0, 75.0)
-        with col2:
-            m_dl = st.number_input("Digital Logic", 0.0, 100.0, 85.0)
-            m_math = st.number_input("Mathematics", 0.0, 100.0, 90.0)
-        
-        submitted = st.form_submit_button("Save Student Record")
-        if submitted:
-            if name.strip() == "":
-                st.warning("Please enter a valid student name.")
-            else:
-                subjects = {
-                    "Python": m_python,
-                    "Data Structures": m_ds,
-                    "Digital Logic": m_dl,
-                    "Mathematics": m_math
-                }
-                new_student = Student(int(s_id), name, int(age), subjects)
-                st.session_state.students.append(new_student)
-                save_records(st.session_state.students)
-                st.success(f"Successfully added record for {name}!")
-                st.session_state.suggested_id = random.randint(1001, 9999)
+    current_subjects = st.session_state.subjects
+    if not current_subjects:
+        st.warning("Please add subjects first in the 'Manage Subjects' menu!")
+    else:
+        with st.form("add_form"):
+            s_id = st.number_input("Student ID", min_value=1, value=st.session_state.suggested_id)
+            name = st.text_input("Full Name")
+            age = st.number_input("Age", min_value=17, max_value=100, value=20)
+            
+            st.markdown(f"### Enter Marks (Out of 100) for {len(current_subjects)} Subjects")
+            subject_marks = {}
+            
+            # Dynamically generate input fields based on active subjects list
+            cols = st.columns(2)
+            for idx, sub in enumerate(current_subjects):
+                with cols[idx % 2]:
+                    subject_marks[sub] = st.number_input(f"{sub}", 0.0, 100.0, 75.0, key=f"add_{sub}")
+            
+            submitted = st.form_submit_button("Save Student Record")
+            if submitted:
+                if name.strip() == "":
+                    st.warning("Please enter a valid student name.")
+                else:
+                    new_student = Student(int(s_id), name, int(age), subject_marks)
+                    st.session_state.students.append(new_student)
+                    save_records(st.session_state.students)
+                    st.success(f"Successfully added record for {name}!")
+                    st.session_state.suggested_id = random.randint(1001, 9999)
 
 
 # --- OPTION 2: VIEW RECORDS ---
@@ -220,22 +249,103 @@ elif menu == "📋 View All Records":
     else:
         data = []
         for s in st.session_state.students:
-            subj = s.get_subjects()
-            data.append({
+            record = {
                 "ID": s.get_student_id(),
                 "Name": s.get_name(),
-                "Age": s.get_age(),
-                "Python": subj["Python"],
-                "Data Structures": subj["Data Structures"],
-                "Digital Logic": subj["Digital Logic"],
-                "Mathematics": subj["Mathematics"],
-                "Total Marks": s.get_total_marks(),
-                "Percentage (%)": f"{s.get_percentage()}%"
-            })
+                "Age": s.get_age()
+            }
+            # Add dynamic subject marks
+            for sub, mark in s.get_subjects().items():
+                record[sub] = mark
+            record["Total Marks"] = s.get_total_marks()
+            record["Percentage (%)"] = f"{s.get_percentage()}%"
+            data.append(record)
+            
         st.dataframe(data, use_container_width=True)
 
 
-# --- OPTION 3: SEARCH STUDENT (UNIT III) ---
+# --- OPTION 3: EDIT STUDENT RECORD ---
+elif menu == "✏️ Edit Student Record":
+    st.subheader("Edit Existing Student Details & Marks")
+    
+    if not st.session_state.students:
+        st.info("No records available to edit.")
+    else:
+        student_ids = [s.get_student_id() for s in st.session_state.students]
+        selected_id = st.selectbox("Select Student ID to Edit", student_ids)
+        
+        # Find selected student
+        target_student = next((s for s in st.session_state.students if s.get_student_id() == selected_id), None)
+        
+        if target_student:
+            with st.form("edit_form"):
+                new_name = st.text_input("Full Name", value=target_student.get_name())
+                new_age = st.number_input("Age", min_value=17, max_value=100, value=target_student.get_age())
+                
+                st.markdown("### Update Subject Marks")
+                current_subs = target_student.get_subjects()
+                updated_marks = {}
+                
+                # Ensure all currently active subjects are present
+                for sub in st.session_state.subjects:
+                    default_val = current_subs.get(sub, 50.0)
+                    updated_marks[sub] = st.number_input(f"{sub}", 0.0, 100.0, float(default_val), key=f"edit_{sub}")
+                
+                update_btn = st.form_submit_button("Update Record")
+                if update_btn:
+                    target_student.set_name(new_name)
+                    target_student.set_age(int(new_age))
+                    target_student.set_subjects(updated_marks)
+                    save_records(st.session_state.students)
+                    st.success(f"Successfully updated record for ID {selected_id}!")
+
+
+# --- OPTION 4: MANAGE SUBJECTS ---
+elif menu == "📚 Manage Subjects":
+    st.subheader("Add or Remove Subjects")
+    
+    st.write("Current Subjects in Syllabus:")
+    for idx, sub in enumerate(st.session_state.subjects):
+        st.markdown(f"- **{sub}**")
+        
+    st.divider()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### Add New Subject")
+        new_sub = st.text_input("Subject Name")
+        if st.button("Add Subject"):
+            if new_sub.strip() == "":
+                st.warning("Subject name cannot be empty.")
+            elif new_sub in st.session_state.subjects:
+                st.error("Subject already exists!")
+            else:
+                st.session_state.subjects.append(new_sub.strip())
+                save_subjects(st.session_state.subjects)
+                st.success(f"Added subject: {new_sub}")
+                st.rerun()
+                
+    with col2:
+        st.markdown("### Remove Subject")
+        sub_to_remove = st.selectbox("Select Subject to Remove", st.session_state.subjects)
+        if st.button("Remove Subject"):
+            if len(st.session_state.subjects) <= 1:
+                st.error("You must keep at least one subject!")
+            else:
+                st.session_state.subjects.remove(sub_to_remove)
+                save_subjects(st.session_state.subjects)
+                # Also clean up from existing students if needed
+                for s in st.session_state.students:
+                    subs = s.get_subjects()
+                    if sub_to_remove in subs:
+                        del subs[sub_to_remove]
+                        s.set_subjects(subs)
+                save_records(st.session_state.students)
+                st.success(f"Removed subject: {sub_to_remove}")
+                st.rerun()
+
+
+# --- OPTION 5: SEARCH STUDENT (UNIT III) ---
 elif menu == "🔍 Search by ID (Linear Search)":
     st.subheader("Search Student Record via Linear Search Algorithm")
     
@@ -251,19 +361,18 @@ elif menu == "🔍 Search by ID (Linear Search)":
         
         if found_student:
             st.success("Record Found!")
-            subj = found_student.get_subjects()
             col1, col2, col3 = st.columns(3)
             col1.metric("Student Name", found_student.get_name())
-            col2.metric("Total Marks", f"{found_student.get_total_marks()} / 400")
+            col2.metric("Total Marks", f"{found_student.get_total_marks()} / {len(found_student.get_subjects()) * 100}")
             col3.metric("Percentage", f"{found_student.get_percentage()}%")
             
             st.write("**Subject-wise Breakdown:**")
-            st.json(subj)
+            st.json(found_student.get_subjects())
         else:
             st.error("Student with this ID does not exist.")
 
 
-# --- OPTION 4: FILTER HIGH ACHIEVERS (UNIT IV) ---
+# --- OPTION 6: FILTER HIGH ACHIEVERS (UNIT IV) ---
 elif menu == "⭐ Filter High Achievers (Lambda)":
     st.subheader("Filter Top Students Based on Percentage")
     
