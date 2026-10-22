@@ -119,12 +119,11 @@ class Student(Person):
         return round((self.get_total_marks() / total_max) * 100, 2) if total_max > 0 else 0.0
 
     def to_file_format(self):
-        # Store as CSV with JSON string for subjects dictionary (Unit V)
         subj_json = json.dumps(self.__subjects)
         return f"{self.__student_id},{self._name},{self._age},{subj_json}\n"
 
 
-# --- SYLLABUS UNIT V: Text Files & Subject/Student Management ---
+# --- SYLLABUS UNIT V: Text Files & File Management ---
 SUBJECT_FILE = "subjects.txt"
 STUDENT_FILE = "students_v3.txt"
 
@@ -192,6 +191,7 @@ menu = st.sidebar.radio("Go to", [
     "📋 View All Records", 
     "✏️ Edit Student Record",
     "📚 Manage Subjects",
+    "👥 Manage Teachers",
     "🔍 Search by ID (Linear Search)", 
     "⭐ Filter High Achievers (Lambda)"
 ])
@@ -222,7 +222,6 @@ if menu == "➕ Add Student & Marks":
             st.markdown(f"### Enter Marks (Out of 100) for {len(current_subjects)} Subjects")
             subject_marks = {}
             
-            # Dynamically generate input fields based on active subjects list
             cols = st.columns(2)
             for idx, sub in enumerate(current_subjects):
                 with cols[idx % 2]:
@@ -254,7 +253,6 @@ elif menu == "📋 View All Records":
                 "Name": s.get_name(),
                 "Age": s.get_age()
             }
-            # Add dynamic subject marks
             for sub, mark in s.get_subjects().items():
                 record[sub] = mark
             record["Total Marks"] = s.get_total_marks()
@@ -274,7 +272,6 @@ elif menu == "✏️ Edit Student Record":
         student_ids = [s.get_student_id() for s in st.session_state.students]
         selected_id = st.selectbox("Select Student ID to Edit", student_ids)
         
-        # Find selected student
         target_student = next((s for s in st.session_state.students if s.get_student_id() == selected_id), None)
         
         if target_student:
@@ -286,7 +283,6 @@ elif menu == "✏️ Edit Student Record":
                 current_subs = target_student.get_subjects()
                 updated_marks = {}
                 
-                # Ensure all currently active subjects are present
                 for sub in st.session_state.subjects:
                     default_val = current_subs.get(sub, 50.0)
                     updated_marks[sub] = st.number_input(f"{sub}", 0.0, 100.0, float(default_val), key=f"edit_{sub}")
@@ -305,7 +301,7 @@ elif menu == "📚 Manage Subjects":
     st.subheader("Add or Remove Subjects")
     
     st.write("Current Subjects in Syllabus:")
-    for idx, sub in enumerate(st.session_state.subjects):
+    for sub in st.session_state.subjects:
         st.markdown(f"- **{sub}**")
         
     st.divider()
@@ -334,7 +330,6 @@ elif menu == "📚 Manage Subjects":
             else:
                 st.session_state.subjects.remove(sub_to_remove)
                 save_subjects(st.session_state.subjects)
-                # Also clean up from existing students if needed
                 for s in st.session_state.students:
                     subs = s.get_subjects()
                     if sub_to_remove in subs:
@@ -345,7 +340,38 @@ elif menu == "📚 Manage Subjects":
                 st.rerun()
 
 
-# --- OPTION 5: SEARCH STUDENT (UNIT III) ---
+# --- OPTION 5: MANAGE TEACHERS ---
+elif menu == "👥 Manage Teachers":
+    st.subheader("Manage Registered Teacher Accounts")
+    
+    teachers_db = load_teachers()
+    st.write(f"Total Registered Teachers: **{len(teachers_db)}**")
+    
+    for uname in teachers_db.keys():
+        st.markdown(f"- **{uname}**")
+        
+    st.divider()
+    st.markdown("### Delete Teacher Account")
+    teacher_to_delete = st.selectbox("Select Teacher Username to Delete", list(teachers_db.keys()))
+    
+    if st.button("Delete Teacher Account"):
+        if teacher_to_delete == st.session_state.current_user:
+            st.error("Security Error: You cannot delete your own account while you are logged in!")
+        elif teacher_to_delete == "teacher":
+            st.error("Security Error: The default system account ('teacher') cannot be deleted.")
+        else:
+            del teachers_db[teacher_to_delete]
+            try:
+                with open(TEACHER_FILE, "w") as file:
+                    for u, p in teachers_db.items():
+                        file.write(f"{u},{p}\n")
+                st.success(f"Successfully deleted teacher account: {teacher_to_delete}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to update file: {e}")
+
+
+# --- OPTION 6: SEARCH STUDENT (UNIT III) ---
 elif menu == "🔍 Search by ID (Linear Search)":
     st.subheader("Search Student Record via Linear Search Algorithm")
     
@@ -353,7 +379,6 @@ elif menu == "🔍 Search by ID (Linear Search)":
     
     if st.button("Search"):
         found_student = None
-        # Linear Search Implementation (Unit III)
         for student in st.session_state.students:
             if student.get_student_id() == target_id:
                 found_student = student
@@ -372,14 +397,13 @@ elif menu == "🔍 Search by ID (Linear Search)":
             st.error("Student with this ID does not exist.")
 
 
-# --- OPTION 6: FILTER HIGH ACHIEVERS (UNIT IV) ---
+# --- OPTION 7: FILTER HIGH ACHIEVERS (UNIT IV) ---
 elif menu == "⭐ Filter High Achievers (Lambda)":
     st.subheader("Filter Top Students Based on Percentage")
     
     threshold = st.slider("Minimum Percentage Threshold (%)", 0.0, 100.0, 75.0)
     
     if st.button("Filter"):
-        # Unit IV: Lambda Function and List Comprehension using percentage
         is_high_achiever = lambda s: s.get_percentage() >= threshold
         filtered = [s for s in st.session_state.students if is_high_achiever(s)]
         
