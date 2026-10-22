@@ -7,7 +7,7 @@ import json
 TEACHER_FILE = "teachers.txt"
 
 def load_teachers():
-    # Default admin account
+    # Default admin account + any registered teachers
     teachers = {"admin": "admin123"}
     if os.path.exists(TEACHER_FILE):
         try:
@@ -35,27 +35,49 @@ if "authenticated" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
 
-# --- LOGIN SCREEN (RESTRICTED ACCESS) ---
+# --- LOGIN & SIGN-UP PORTAL SCREEN ---
 if not st.session_state.authenticated:
-    st.set_page_config(page_title="Portal Login", page_icon="🔐")
-    st.title("🔐 Portal Login")
-    st.markdown("Enter your credentials to access the system.")
+    st.set_page_config(page_title="Teacher Portal - Authentication", page_icon="🔐")
+    st.title("🔐 Teacher Portal Authentication")
+    st.markdown("Please log in or sign up for a new teacher account to manage student records.")
     
+    auth_mode = st.radio("Select Option", ["Login", "Sign Up (Register)"], horizontal=True)
     teachers_db = load_teachers()
     
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        login_btn = st.form_submit_button("Login")
-        
-        if login_btn:
-            if username in teachers_db and teachers_db[username] == password:
-                st.session_state.authenticated = True
-                st.session_state.current_user = username
-                st.success("Login successful! Loading dashboard...")
-                st.rerun()
-            else:
-                st.error("Invalid username or password. (Default Admin: admin / admin123)")
+    if auth_mode == "Login":
+        st.subheader("Teacher Login")
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            login_btn = st.form_submit_button("Login")
+            
+            if login_btn:
+                if username in teachers_db and teachers_db[username] == password:
+                    st.session_state.authenticated = True
+                    st.session_state.current_user = username
+                    st.success("Login successful! Loading dashboard...")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password. (Default Admin: admin / admin123)")
+    else:
+        st.subheader("Teacher Registration (Sign Up)")
+        with st.form("signup_form"):
+            new_user = st.text_input("Choose Username")
+            new_pass = st.text_input("Choose Password", type="password")
+            confirm_pass = st.text_input("Confirm Password", type="password")
+            signup_btn = st.form_submit_button("Register Account")
+            
+            if signup_btn:
+                if not new_user.strip() or not new_pass.strip():
+                    st.warning("Please fill in all fields.")
+                elif new_pass != confirm_pass:
+                    st.error("Passwords do not match!")
+                elif new_user in teachers_db:
+                    st.error("Username already exists! Please choose another or log in.")
+                else:
+                    teachers_db[new_user.strip()] = new_pass.strip()
+                    save_teachers_to_file(teachers_db)
+                    st.success("Registration successful! You can now switch to 'Login' above.")
     st.stop()
 
 
@@ -337,34 +359,12 @@ elif menu == "👥 Manage Teachers":
         st.subheader("Admin Panel: Manage Teacher Accounts")
         
         teachers_db = load_teachers()
-        
-        # Section 1: Add New Teacher Account
-        st.markdown("### Create New Teacher Account")
-        with st.form("create_teacher_form"):
-            new_t_user = st.text_input("New Teacher Username")
-            new_t_pass = st.text_input("New Teacher Password", type="password")
-            create_t_btn = st.form_submit_button("Create Account")
-            
-            if create_t_btn:
-                if not new_t_user.strip() or not new_t_pass.strip():
-                    st.warning("Please enter both username and password.")
-                elif new_t_user in teachers_db:
-                    st.error("Username already exists!")
-                else:
-                    teachers_db[new_t_user.strip()] = new_t_pass.strip()
-                    save_teachers_to_file(teachers_db)
-                    st.success(f"Successfully created teacher account for '{new_t_user}'!")
-                    st.rerun()
-                    
-        st.divider()
-        
-        # Section 2: View & Delete Existing Teachers
-        st.markdown("### Existing Teacher Accounts")
-        st.write(f"Total Accounts: **{len(teachers_db)}**")
+        st.write(f"Total Registered Accounts: **{len(teachers_db)}**")
         
         for uname in teachers_db.keys():
             st.markdown(f"- **{uname}**")
             
+        st.divider()
         st.markdown("### Delete Teacher Account")
         deletable_teachers = [u for u in teachers_db.keys() if u != "admin"]
         
