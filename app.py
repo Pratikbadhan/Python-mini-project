@@ -2,33 +2,80 @@ import streamlit as st
 import random
 import os
 
-# --- AUTHENTICATION CONFIGURATION ---
-# Default teacher credentials
-TEACHER_USER = "teacher"
-TEACHER_PASS = "admin123"
+# --- TEACHER AUTHENTICATION & REGISTRATION (UNIT V FILE HANDLING) ---
+TEACHER_FILE = "teachers.txt"
+
+def load_teachers():
+    teachers = {"teacher": "admin123"}  # Default fallback account
+    if os.path.exists(TEACHER_FILE):
+        try:
+            with open(TEACHER_FILE, "r") as file:
+                for line in file:
+                    parts = line.strip().split(",")
+                    if len(parts) == 2:
+                        teachers[parts[0]] = parts[1]
+        except Exception:
+            pass
+    else:
+        # Create default file if missing
+        save_teacher_to_file("teacher", "admin123")
+    return teachers
+
+def save_teacher_to_file(username, password):
+    try:
+        with open(TEACHER_FILE, "a") as file:
+            file.write(f"{username},{password}\n")
+    except IOError as e:
+        st.error(f"Error saving teacher account: {e}")
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = ""
 
-# --- LOGIN PORTAL SCREEN ---
+# --- AUTHENTICATION SCREEN (LOGIN / SIGN UP) ---
 if not st.session_state.authenticated:
-    st.set_page_config(page_title="Teacher Login - Student Portal", page_icon="🔐")
-    st.title("🔐 Teacher Login Portal")
-    st.markdown("Please enter your credentials to access and manage student records.")
+    st.set_page_config(page_title="Teacher Portal - Authentication", page_icon="🔐")
+    st.title("🔐 Teacher Portal Authentication")
+    st.markdown("Please log in or sign up for a new teacher account to manage student records.")
     
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        login_btn = st.form_submit_button("Login")
-        
-        if login_btn:
-            if username == TEACHER_USER and password == TEACHER_PASS:
-                st.session_state.authenticated = True
-                st.success("Login successful! Loading dashboard...")
-                st.rerun()
-            else:
-                st.error("Invalid username or password. (Hint: teacher / admin123)")
-    st.stop()  # Stop execution here until authenticated
+    auth_mode = st.radio("Select Option", ["Login", "Sign Up (Register)"], horizontal=True)
+    teachers_db = load_teachers()
+    
+    if auth_mode == "Login":
+        st.subheader("Teacher Login")
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            login_btn = st.form_submit_button("Login")
+            
+            if login_btn:
+                if username in teachers_db and teachers_db[username] == password:
+                    st.session_state.authenticated = True
+                    st.session_state.current_user = username
+                    st.success("Login successful! Loading dashboard...")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password. (Default: teacher / admin123)")
+    else:
+        st.subheader("Teacher Registration (Sign Up)")
+        with st.form("signup_form"):
+            new_user = st.text_input("Choose Username")
+            new_pass = st.text_input("Choose Password", type="password")
+            confirm_pass = st.text_input("Confirm Password", type="password")
+            signup_btn = st.form_submit_button("Register Account")
+            
+            if signup_btn:
+                if not new_user.strip() or not new_pass.strip():
+                    st.warning("Please fill in all fields.")
+                elif new_pass != confirm_pass:
+                    st.error("Passwords do not match!")
+                elif new_user in teachers_db:
+                    st.error("Username already exists! Please choose another or log in.")
+                else:
+                    save_teacher_to_file(new_user.strip(), new_pass.strip())
+                    st.success("Registration successful! You can now switch to 'Login' above.")
+    st.stop()  # Halt execution until authenticated
 
 
 # --- SYLLABUS UNIT IV: OOPs Concepts (Inheritance & Data Hiding) ---
@@ -63,19 +110,18 @@ class Student(Person):
         return round((self.get_total_marks() / total_max) * 100, 2) if total_max > 0 else 0.0
 
     def to_file_format(self):
-        # Format: id,name,age,python,ds,digital_logic,math
         subj_values = ",".join(str(v) for v in self.__subjects.values())
         return f"{self.__student_id},{self._name},{self._age},{subj_values}\n"
 
 
 # --- SYLLABUS UNIT V: Text Files & Exception Handling ---
-FILENAME = "students_v2.txt"
+STUDENT_FILE = "students_v2.txt"
 
 def load_records():
     students = []
-    if os.path.exists(FILENAME):
+    if os.path.exists(STUDENT_FILE):
         try:
-            with open(FILENAME, "r") as file:
+            with open(STUDENT_FILE, "r") as file:
                 for line in file:
                     parts = line.strip().split(",")
                     if len(parts) >= 7:
@@ -93,7 +139,7 @@ def load_records():
 
 def save_records(students):
     try:
-        with open(FILENAME, "w") as file:
+        with open(STUDENT_FILE, "w") as file:
             for student in students:
                 file.write(student.to_file_format())
     except IOError as e:
@@ -107,7 +153,7 @@ if "students" not in st.session_state:
 
 # --- STREAMLIT DASHBOARD UI ---
 st.title("🎓 Student Record Management System")
-st.markdown("*B.Tech Computer Science Mini-Project | Teacher Dashboard*")
+st.markdown(f"*Logged in as teacher: **{st.session_state.current_user}** | B.Tech Computer Science Mini-Project*")
 st.divider()
 
 # Sidebar Navigation & Logout
@@ -122,6 +168,7 @@ menu = st.sidebar.radio("Go to", [
 st.sidebar.divider()
 if st.sidebar.button("🔒 Logout"):
     st.session_state.authenticated = False
+    st.session_state.current_user = ""
     st.rerun()
 
 
