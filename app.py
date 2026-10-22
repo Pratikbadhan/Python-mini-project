@@ -3,11 +3,12 @@ import random
 import os
 import json
 
-# --- TEACHER AUTHENTICATION & REGISTRATION (UNIT V) ---
+# --- AUTHENTICATION & ROLE MANAGEMENT (UNIT V) ---
 TEACHER_FILE = "teachers.txt"
 
 def load_teachers():
-    teachers = {"teacher": "admin123"}
+    # Default admin account
+    teachers = {"admin": "admin123"}
     if os.path.exists(TEACHER_FILE):
         try:
             with open(TEACHER_FILE, "r") as file:
@@ -18,63 +19,43 @@ def load_teachers():
         except Exception:
             pass
     else:
-        save_teacher_to_file("teacher", "admin123")
+        save_teachers_to_file(teachers)
     return teachers
 
-def save_teacher_to_file(username, password):
+def save_teachers_to_file(teachers_dict):
     try:
-        with open(TEACHER_FILE, "a") as file:
-            file.write(f"{username},{password}\n")
+        with open(TEACHER_FILE, "w") as file:
+            for uname, pwd in teachers_dict.items():
+                file.write(f"{uname},{pwd}\n")
     except IOError as e:
-        st.error(f"Error saving teacher account: {e}")
+        st.error(f"Error saving teacher accounts: {e}")
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
 
-# --- AUTHENTICATION SCREEN ---
+# --- LOGIN SCREEN (RESTRICTED ACCESS) ---
 if not st.session_state.authenticated:
-    st.set_page_config(page_title="Teacher Portal - Authentication", page_icon="🔐")
-    st.title("🔐 Teacher Portal Authentication")
-    st.markdown("Please log in or sign up for a new teacher account to manage student records.")
+    st.set_page_config(page_title="Portal Login", page_icon="🔐")
+    st.title("🔐 Portal Login")
+    st.markdown("Enter your credentials to access the system.")
     
-    auth_mode = st.radio("Select Option", ["Login", "Sign Up (Register)"], horizontal=True)
     teachers_db = load_teachers()
     
-    if auth_mode == "Login":
-        st.subheader("Teacher Login")
-        with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            login_btn = st.form_submit_button("Login")
-            
-            if login_btn:
-                if username in teachers_db and teachers_db[username] == password:
-                    st.session_state.authenticated = True
-                    st.session_state.current_user = username
-                    st.success("Login successful! Loading dashboard...")
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password. (Default: teacher / admin123)")
-    else:
-        st.subheader("Teacher Registration (Sign Up)")
-        with st.form("signup_form"):
-            new_user = st.text_input("Choose Username")
-            new_pass = st.text_input("Choose Password", type="password")
-            confirm_pass = st.text_input("Confirm Password", type="password")
-            signup_btn = st.form_submit_button("Register Account")
-            
-            if signup_btn:
-                if not new_user.strip() or not new_pass.strip():
-                    st.warning("Please fill in all fields.")
-                elif new_pass != confirm_pass:
-                    st.error("Passwords do not match!")
-                elif new_user in teachers_db:
-                    st.error("Username already exists! Please choose another or log in.")
-                else:
-                    save_teacher_to_file(new_user.strip(), new_pass.strip())
-                    st.success("Registration successful! You can now switch to 'Login' above.")
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        login_btn = st.form_submit_button("Login")
+        
+        if login_btn:
+            if username in teachers_db and teachers_db[username] == password:
+                st.session_state.authenticated = True
+                st.session_state.current_user = username
+                st.success("Login successful! Loading dashboard...")
+                st.rerun()
+            else:
+                st.error("Invalid username or password. (Default Admin: admin / admin123)")
     st.stop()
 
 
@@ -180,21 +161,29 @@ if "students" not in st.session_state:
 
 
 # --- STREAMLIT DASHBOARD UI ---
+is_admin = (st.session_state.current_user == "admin")
+
 st.title("🎓 Student Record Management System")
-st.markdown(f"*Logged in as: **{st.session_state.current_user}** | B.Tech Computer Science Mini-Project*")
+role_label = "Administrator (Admin)" if is_admin else f"Teacher ({st.session_state.current_user})"
+st.markdown(f"*Logged in as: **{role_label}** | B.Tech Computer Science Mini-Project*")
 st.divider()
 
-# Sidebar Navigation & Logout
-st.sidebar.title("Navigation")
-menu = st.sidebar.radio("Go to", [
+# Build dynamic sidebar navigation based on role
+nav_options = [
     "➕ Add Student & Marks", 
     "📋 View All Records", 
     "✏️ Edit Student Record",
     "📚 Manage Subjects",
-    "👥 Manage Teachers",
     "🔍 Search by ID (Linear Search)", 
     "⭐ Filter High Achievers (Lambda)"
-])
+]
+
+# Insert 'Manage Teachers' option exclusively for the Admin
+if is_admin:
+    nav_options.insert(4, "👥 Manage Teachers")
+
+st.sidebar.title("Navigation")
+menu = st.sidebar.radio("Go to", nav_options)
 
 st.sidebar.divider()
 if st.sidebar.button("🔒 Logout"):
@@ -340,35 +329,54 @@ elif menu == "📚 Manage Subjects":
                 st.rerun()
 
 
-# --- OPTION 5: MANAGE TEACHERS ---
+# --- OPTION 5: MANAGE TEACHERS (ADMIN ONLY) ---
 elif menu == "👥 Manage Teachers":
-    st.subheader("Manage Registered Teacher Accounts")
-    
-    teachers_db = load_teachers()
-    st.write(f"Total Registered Teachers: **{len(teachers_db)}**")
-    
-    for uname in teachers_db.keys():
-        st.markdown(f"- **{uname}**")
+    if not is_admin:
+        st.error("Access Denied: Only the Administrator can manage teachers.")
+    else:
+        st.subheader("Admin Panel: Manage Teacher Accounts")
         
-    st.divider()
-    st.markdown("### Delete Teacher Account")
-    teacher_to_delete = st.selectbox("Select Teacher Username to Delete", list(teachers_db.keys()))
-    
-    if st.button("Delete Teacher Account"):
-        if teacher_to_delete == st.session_state.current_user:
-            st.error("Security Error: You cannot delete your own account while you are logged in!")
-        elif teacher_to_delete == "teacher":
-            st.error("Security Error: The default system account ('teacher') cannot be deleted.")
+        teachers_db = load_teachers()
+        
+        # Section 1: Add New Teacher Account
+        st.markdown("### Create New Teacher Account")
+        with st.form("create_teacher_form"):
+            new_t_user = st.text_input("New Teacher Username")
+            new_t_pass = st.text_input("New Teacher Password", type="password")
+            create_t_btn = st.form_submit_button("Create Account")
+            
+            if create_t_btn:
+                if not new_t_user.strip() or not new_t_pass.strip():
+                    st.warning("Please enter both username and password.")
+                elif new_t_user in teachers_db:
+                    st.error("Username already exists!")
+                else:
+                    teachers_db[new_t_user.strip()] = new_t_pass.strip()
+                    save_teachers_to_file(teachers_db)
+                    st.success(f"Successfully created teacher account for '{new_t_user}'!")
+                    st.rerun()
+                    
+        st.divider()
+        
+        # Section 2: View & Delete Existing Teachers
+        st.markdown("### Existing Teacher Accounts")
+        st.write(f"Total Accounts: **{len(teachers_db)}**")
+        
+        for uname in teachers_db.keys():
+            st.markdown(f"- **{uname}**")
+            
+        st.markdown("### Delete Teacher Account")
+        deletable_teachers = [u for u in teachers_db.keys() if u != "admin"]
+        
+        if not deletable_teachers:
+            st.info("No removable teacher accounts found (Admin account cannot be deleted).")
         else:
-            del teachers_db[teacher_to_delete]
-            try:
-                with open(TEACHER_FILE, "w") as file:
-                    for u, p in teachers_db.items():
-                        file.write(f"{u},{p}\n")
+            teacher_to_delete = st.selectbox("Select Teacher Username to Delete", deletable_teachers)
+            if st.button("Delete Selected Account"):
+                del teachers_db[teacher_to_delete]
+                save_teachers_to_file(teachers_db)
                 st.success(f"Successfully deleted teacher account: {teacher_to_delete}")
                 st.rerun()
-            except Exception as e:
-                st.error(f"Failed to update file: {e}")
 
 
 # --- OPTION 6: SEARCH STUDENT (UNIT III) ---
