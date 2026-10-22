@@ -8,7 +8,7 @@ TEACHER_FILE = "teachers.txt"
 
 def load_teachers():
     # Default admin account + any registered teachers
-    teachers = {"admin": "admin123"}
+    teachers = {"OwnerP": "admin123"}
     if os.path.exists(TEACHER_FILE):
         try:
             with open(TEACHER_FILE, "r") as file:
