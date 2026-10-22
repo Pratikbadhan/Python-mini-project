@@ -1,0 +1,161 @@
+import streamlit as st
+import random
+import os
+
+# --- SYLLABUS UNIT IV: OOPs Concepts (Inheritance & Data Hiding) ---
+class Person:
+    def __init__(self, name, age):
+        self._name = name      
+        self._age = age        
+
+class Student(Person):
+    def __init__(self, student_id, name, age, marks):
+        super().__init__(name, age)
+        self.__student_id = student_id  
+        self.__marks = float(marks)     
+
+    def get_student_id(self):
+        return self.__student_id
+
+    def get_marks(self):
+        return self.__marks
+
+    def get_name(self):
+        return self._name
+
+    def get_age(self):
+        return self._age
+
+    def to_file_format(self):
+        return f"{self.__student_id},{self._name},{self._age},{self.__marks}\n"
+
+
+# --- SYLLABUS UNIT V: Text Files & Exception Handling ---
+FILENAME = "students.txt"
+
+def load_records():
+    students = []
+    if os.path.exists(FILENAME):
+        try:
+            with open(FILENAME, "r") as file:
+                for line in file:
+                    parts = line.strip().split(",")
+                    if len(parts) == 4:
+                        s_id, name, age, marks = parts
+                        students.append(Student(int(s_id), name, int(age), float(marks)))
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+    return students
+
+def save_records(students):
+    try:
+        with open(FILENAME, "w") as file:
+            for student in students:
+                file.write(student.to_file_format())
+    except IOError as e:
+        st.error(f"Failed to write to file: {e}")
+
+
+# --- INITIALIZE SESSION STATE ---
+if "students" not in st.session_state:
+    st.session_state.students = load_records()
+
+
+# --- STREAMLIT UI DESIGN ---
+st.title("🎓 Student Record Management System")
+st.markdown("*B.Tech Computer Science Mini-Project | Demonstrating OOP, File Handling & Algorithms*")
+st.divider()
+
+# Sidebar Navigation
+menu = st.sidebar.radio("Navigation Menu", [
+    "➕ Add Student", 
+    "📋 View All Records", 
+    "🔍 Search by ID (Linear Search)", 
+    "⭐ Filter High Achievers (Lambda)"
+])
+
+
+# --- OPTION 1: ADD STUDENT ---
+if menu == "➕ Add Student":
+    st.subheader("Register a New Student")
+    
+    # Auto-generate ID suggestion using Unit II random module
+    if "suggested_id" not in st.session_state:
+        st.session_state.suggested_id = random.randint(1001, 9999)
+
+    with st.form("add_form"):
+        s_id = st.number_input("Student ID", min_value=1, value=st.session_state.suggested_id)
+        name = st.text_input("Full Name")
+        age = st.number_input("Age", min_value=17, max_value=100, value=20)
+        marks = st.number_input("Marks (0-100)", min_value=0.0, max_value=100.0, value=85.0)
+        
+        submitted = st.form_submit_button("Save Student Record")
+        if submitted:
+            if name.strip() == "":
+                st.warning("Please enter a valid student name.")
+            else:
+                new_student = Student(int(s_id), name, int(age), float(marks))
+                st.session_state.students.append(new_student)
+                save_records(st.session_state.students)
+                st.success(f"Successfully added {name}!")
+                st.session_state.suggested_id = random.randint(1001, 9999) # Refresh suggested ID
+
+
+# --- OPTION 2: VIEW RECORDS ---
+elif menu == "📋 View All Records":
+    st.subheader("All Student Records")
+    
+    if not st.session_state.students:
+        st.info("No student records found yet. Add some students first!")
+    else:
+        # Convert objects to display format
+        data = []
+        for s in st.session_state.students:
+            data.append({
+                "ID": s.get_student_id(),
+                "Name": s.get_name(),
+                "Age": s.get_age(),
+                "Marks": s.get_marks()
+            })
+        st.table(data)
+
+
+# --- OPTION 3: SEARCH STUDENT (UNIT III) ---
+elif menu == "🔍 Search by ID (Linear Search)":
+    st.subheader("Search Record via Linear Search Algorithm")
+    
+    target_id = st.number_input("Enter Student ID to Search", min_value=1, value=1001)
+    
+    if st.button("Search"):
+        found_student = None
+        # Linear Search Implementation (Unit III)
+        for student in st.session_state.students:
+            if student.get_student_id() == target_id:
+                found_student = student
+                break
+        
+        if found_student:
+            st.success("Record Found!")
+            st.metric(label=found_student.get_name(), value=f"Marks: {found_student.get_marks()}")
+            st.write(f"**ID:** {found_student.get_student_id()} | **Age:** {found_student.get_age()}")
+        else:
+            st.error("Student with this ID does not exist.")
+
+
+# --- OPTION 4: FILTER HIGH ACHIEVERS (UNIT IV) ---
+elif menu == "⭐ Filter High Achievers (Lambda)" :
+    st.subheader("Filter Students Using Lambda & List Comprehension")
+    
+    threshold = st.slider("Minimum Marks Threshold", 0.0, 100.0, 75.0)
+    
+    if st.button("Filter"):
+        # Unit IV: Lambda Function and List Comprehension
+        is_high_achiever = lambda s: s.get_marks() >= threshold
+        filtered = [s for s in st.session_state.students if is_high_achiever(s)]
+        
+        if filtered:
+            st.write(f"Found **{len(filtered)}** students scoring $\ge$ {threshold}:")
+            filtered_data = [{"ID": s.get_student_id(), "Name": s.get_name(), "Marks": s.get_marks()} for s in filtered]
+            st.table(filtered_data)
+        else:
+            st.warning("No students meet this criteria.")
