@@ -6,8 +6,8 @@ import json
 # ==========================================
 # ADMIN CONFIGURATION (Change these as you like)
 # ==========================================
-ADMIN_USERNAME = "admin"      # Change to your desired admin username
-ADMIN_PASSWORD = "admin123"   # Change to your desired admin password
+ADMIN_USERNAME = "OwnerP"      # Change to your desired admin username
+ADMIN_PASSWORD = "Pratik1106"   # Change to your desired admin password
 
 
 # --- AUTHENTICATION & ROLE MANAGEMENT (UNIT V) ---
