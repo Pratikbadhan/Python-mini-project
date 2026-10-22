@@ -3,12 +3,19 @@ import random
 import os
 import json
 
+# ==========================================
+# ADMIN CONFIGURATION (Change these as you like)
+# ==========================================
+ADMIN_USERNAME = "admin"      # Change to your desired admin username
+ADMIN_PASSWORD = "admin123"   # Change to your desired admin password
+
+
 # --- AUTHENTICATION & ROLE MANAGEMENT (UNIT V) ---
 TEACHER_FILE = "teachers.txt"
 
 def load_teachers():
-    # Default admin account + any registered teachers
-    teachers = {"admin": "admin123"}
+    # Load default admin + any registered teachers
+    teachers = {ADMIN_USERNAME: ADMIN_PASSWORD}
     if os.path.exists(TEACHER_FILE):
         try:
             with open(TEACHER_FILE, "r") as file:
@@ -58,7 +65,7 @@ if not st.session_state.authenticated:
                     st.success("Login successful! Loading dashboard...")
                     st.rerun()
                 else:
-                    st.error("Invalid username or password. (Default Admin: admin / admin123)")
+                    st.error("Invalid username or password.")
     else:
         st.subheader("Teacher Registration (Sign Up)")
         with st.form("signup_form"):
@@ -72,7 +79,7 @@ if not st.session_state.authenticated:
                     st.warning("Please fill in all fields.")
                 elif new_pass != confirm_pass:
                     st.error("Passwords do not match!")
-                elif new_user in teachers_db:
+                elif new_user in teachers_db or new_user == ADMIN_USERNAME:
                     st.error("Username already exists! Please choose another or log in.")
                 else:
                     teachers_db[new_user.strip()] = new_pass.strip()
@@ -183,7 +190,7 @@ if "students" not in st.session_state:
 
 
 # --- STREAMLIT DASHBOARD UI ---
-is_admin = (st.session_state.current_user == "admin")
+is_admin = (st.session_state.current_user == ADMIN_USERNAME)
 
 st.title("🎓 Student Record Management System")
 role_label = "Administrator (Admin)" if is_admin else f"Teacher ({st.session_state.current_user})"
@@ -366,7 +373,7 @@ elif menu == "👥 Manage Teachers":
             
         st.divider()
         st.markdown("### Delete Teacher Account")
-        deletable_teachers = [u for u in teachers_db.keys() if u != "admin"]
+        deletable_teachers = [u for u in teachers_db.keys() if u != ADMIN_USERNAME]
         
         if not deletable_teachers:
             st.info("No removable teacher accounts found (Admin account cannot be deleted).")
