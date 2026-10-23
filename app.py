@@ -4,17 +4,16 @@ import os
 import json
 
 # ==========================================
-# ADMIN CONFIGURATION (Change these as you like)
+# ADMIN CONFIGURATION
 # ==========================================
-ADMIN_USERNAME = "OwnerP"      # Change to your desired admin username
-ADMIN_PASSWORD = "Pratik1106"   # Change to your desired admin password
+ADMIN_USERNAME = "admin"      
+ADMIN_PASSWORD = "admin123"   
 
 
 # --- AUTHENTICATION & ROLE MANAGEMENT (UNIT V) ---
 TEACHER_FILE = "teachers.txt"
 
 def load_teachers():
-    # Load default admin + any registered teachers
     teachers = {ADMIN_USERNAME: ADMIN_PASSWORD}
     if os.path.exists(TEACHER_FILE):
         try:
@@ -45,7 +44,7 @@ if "current_user" not in st.session_state:
 # --- LOGIN & SIGN-UP PORTAL SCREEN ---
 if not st.session_state.authenticated:
     st.set_page_config(page_title="Teacher Portal - Authentication", page_icon="🔐")
-    st.title("🔐 Teacher Portal Authentication")
+    st.title("🔐 Teacher Authentication Portal")
     st.markdown("Please log in or sign up for a new teacher account to manage student records.")
     
     auth_mode = st.radio("Select Option", ["Login", "Sign Up (Register)"], horizontal=True)
@@ -98,7 +97,7 @@ class Student(Person):
     def __init__(self, student_id, name, age, subjects_dict):
         super().__init__(name, age)
         self.__student_id = student_id  
-        self.__subjects = subjects_dict  # Dictionary of subject-wise marks
+        self.__subjects = subjects_dict  # Dictionary mapping subject code to marks
 
     def get_student_id(self):
         return self.__student_id
@@ -134,27 +133,37 @@ class Student(Person):
 
 
 # --- SYLLABUS UNIT V: Text Files & File Management ---
-SUBJECT_FILE = "subjects.txt"
-STUDENT_FILE = "students_v3.txt"
+SUBJECT_FILE = "subjects_v2.txt"
+STUDENT_FILE = "students_v4.txt"
 
 def load_subjects():
-    default_subjects = ["Python Programming", "Data Structures", "Digital Logic", "Mathematics"]
+    default_subjects = {
+        "UBTCE203": "Python Programming",
+        "UBTCE201": "Data Structures",
+        "UBTCEOE201": "Digital Logic",
+        "UBTCE223": "Discrete Structures"
+        "UBTCE219": "Computer Organization"
+    }
     if os.path.exists(SUBJECT_FILE):
         try:
+            subs = {}
             with open(SUBJECT_FILE, "r") as file:
-                subs = [line.strip() for line in file if line.strip()]
-                return subs if subs else default_subjects
+                for line in file:
+                    parts = line.strip().split(",", 1)
+                    if len(parts) == 2:
+                        subs[parts[0]] = parts[1]
+            return subs if subs else default_subjects
         except Exception:
             return default_subjects
     else:
         save_subjects(default_subjects)
         return default_subjects
 
-def save_subjects(subjects_list):
+def save_subjects(subjects_dict):
     try:
         with open(SUBJECT_FILE, "w") as file:
-            for sub in subjects_list:
-                file.write(f"{sub}\n")
+            for code, name in subjects_dict.items():
+                file.write(f"{code},{name}\n")
     except IOError as e:
         st.error(f"Error saving subjects: {e}")
 
@@ -207,7 +216,6 @@ nav_options = [
     "⭐ Filter High Achievers (Lambda)"
 ]
 
-# Insert 'Manage Teachers' option exclusively for the Admin
 if is_admin:
     nav_options.insert(4, "👥 Manage Teachers")
 
@@ -241,9 +249,9 @@ if menu == "➕ Add Student & Marks":
             subject_marks = {}
             
             cols = st.columns(2)
-            for idx, sub in enumerate(current_subjects):
+            for idx, (code, name_sub) in enumerate(current_subjects.items()):
                 with cols[idx % 2]:
-                    subject_marks[sub] = st.number_input(f"{sub}", 0.0, 100.0, 75.0, key=f"add_{sub}")
+                    subject_marks[code] = st.number_input(f"[{code}] {name_sub}", 0.0, 100.0, 75.0, key=f"add_{code}")
             
             submitted = st.form_submit_button("Save Student Record")
             if submitted:
@@ -271,8 +279,9 @@ elif menu == "📋 View All Records":
                 "Name": s.get_name(),
                 "Age": s.get_age()
             }
-            for sub, mark in s.get_subjects().items():
-                record[sub] = mark
+            for code, mark in s.get_subjects().items():
+                sub_name = st.session_state.subjects.get(code, code)
+                record[f"[{code}] {sub_name}"] = mark
             record["Total Marks"] = s.get_total_marks()
             record["Percentage (%)"] = f"{s.get_percentage()}%"
             data.append(record)
@@ -298,12 +307,12 @@ elif menu == "✏️ Edit Student Record":
                 new_age = st.number_input("Age", min_value=17, max_value=100, value=target_student.get_age())
                 
                 st.markdown("### Update Subject Marks")
-                current_subs = target_student.get_subjects()
+                current_subs_marks = target_student.get_subjects()
                 updated_marks = {}
                 
-                for sub in st.session_state.subjects:
-                    default_val = current_subs.get(sub, 50.0)
-                    updated_marks[sub] = st.number_input(f"{sub}", 0.0, 100.0, float(default_val), key=f"edit_{sub}")
+                for code, name_sub in st.session_state.subjects.items():
+                    default_val = current_subs_marks.get(code, 50.0)
+                    updated_marks[code] = st.number_input(f"[{code}] {name_sub}", 0.0, 100.0, float(default_val), key=f"edit_{code}")
                 
                 update_btn = st.form_submit_button("Update Record")
                 if update_btn:
@@ -316,45 +325,46 @@ elif menu == "✏️ Edit Student Record":
 
 # --- OPTION 4: MANAGE SUBJECTS ---
 elif menu == "📚 Manage Subjects":
-    st.subheader("Add or Remove Subjects")
+    st.subheader("Add or Remove Subjects with Codes")
     
-    st.write("Current Subjects in Syllabus:")
-    for sub in st.session_state.subjects:
-        st.markdown(f"- **{sub}**")
+    st.write("Current Syllabus Subjects:")
+    for code, name_sub in st.session_state.subjects.items():
+        st.markdown(f"- **`{code}`**: {name_sub}")
         
     st.divider()
     
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### Add New Subject")
-        new_sub = st.text_input("Subject Name")
+        new_code = st.text_input("Subject Code (e.g. CS301)")
+        new_name = st.text_input("Subject Name (e.g. Operating Systems)")
         if st.button("Add Subject"):
-            if new_sub.strip() == "":
-                st.warning("Subject name cannot be empty.")
-            elif new_sub in st.session_state.subjects:
-                st.error("Subject already exists!")
+            if not new_code.strip() or not new_name.strip():
+                st.warning("Both Subject Code and Name are required.")
+            elif new_code.strip() in st.session_state.subjects:
+                st.error("Subject Code already exists!")
             else:
-                st.session_state.subjects.append(new_sub.strip())
+                st.session_state.subjects[new_code.strip().upper()] = new_name.strip()
                 save_subjects(st.session_state.subjects)
-                st.success(f"Added subject: {new_sub}")
+                st.success(f"Added [{new_code.upper()}] {new_name}")
                 st.rerun()
                 
     with col2:
         st.markdown("### Remove Subject")
-        sub_to_remove = st.selectbox("Select Subject to Remove", st.session_state.subjects)
+        code_to_remove = st.selectbox("Select Subject Code to Remove", list(st.session_state.subjects.keys()))
         if st.button("Remove Subject"):
             if len(st.session_state.subjects) <= 1:
                 st.error("You must keep at least one subject!")
             else:
-                st.session_state.subjects.remove(sub_to_remove)
+                removed_name = st.session_state.subjects.pop(code_to_remove)
                 save_subjects(st.session_state.subjects)
                 for s in st.session_state.students:
                     subs = s.get_subjects()
-                    if sub_to_remove in subs:
-                        del subs[sub_to_remove]
+                    if code_to_remove in subs:
+                        del subs[code_to_remove]
                         s.set_subjects(subs)
                 save_records(st.session_state.students)
-                st.success(f"Removed subject: {sub_to_remove}")
+                st.success(f"Removed [{code_to_remove}] {removed_name}")
                 st.rerun()
 
 
@@ -407,7 +417,9 @@ elif menu == "🔍 Search by ID (Linear Search)":
             col3.metric("Percentage", f"{found_student.get_percentage()}%")
             
             st.write("**Subject-wise Breakdown:**")
-            st.json(found_student.get_subjects())
+            # Display with subject names instead of just codes
+            readable_subjects = {f"[{code}] {st.session_state.subjects.get(code, code)}": mark for code, mark in found_student.get_subjects().items()}
+            st.json(readable_subjects)
         else:
             st.error("Student with this ID does not exist.")
 
