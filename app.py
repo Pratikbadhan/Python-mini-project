@@ -141,7 +141,7 @@ def load_subjects():
         "UBTCE203": "Python Programming",
         "UBTCE201": "Data Structures",
         "UBTCEOE201": "Digital Logic",
-        "UBTCE223": "Discrete Structures"
+        "UBTCE223": "Discrete Structures",
         "UBTCE219": "Computer Organization"
     }
     if os.path.exists(SUBJECT_FILE):
