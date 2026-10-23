@@ -43,7 +43,7 @@ if "current_user" not in st.session_state:
 
 # --- LOGIN & SIGN-UP PORTAL SCREEN ---
 if not st.session_state.authenticated:
-    st.set_page_config(page_title="Teacher Portal - Authentication", page_icon="🔐")
+    st.set_page_config(page_title="Teacher Authentication - Portal", page_icon="🔐")
     st.title("🔐 Teacher Authentication Portal")
     st.markdown("Please log in or sign up for a new teacher account to manage student records.")
     
@@ -96,7 +96,7 @@ class Person:
 class Student(Person):
     def __init__(self, student_id, name, age, subjects_dict):
         super().__init__(name, age)
-        self.__student_id = student_id  
+        self.__student_id = str(student_id)  # Stored as string to support letters and numbers
         self.__subjects = subjects_dict  # Dictionary mapping subject code to marks
 
     def get_student_id(self):
@@ -138,11 +138,10 @@ STUDENT_FILE = "students_v4.txt"
 
 def load_subjects():
     default_subjects = {
-        "UBTCE203": "Python Programming",
-        "UBTCE201": "Data Structures",
-        "UBTCEOE201": "Digital Logic",
-        "UBTCE223": "Discrete Structures",
-        "UBTCE219": "Computer Organization"
+        "CS101": "Python Programming",
+        "CS102": "Data Structures",
+        "CS201": "Digital Logic",
+        "MA201": "Mathematics"
     }
     if os.path.exists(SUBJECT_FILE):
         try:
@@ -175,7 +174,7 @@ def load_records():
                 for line in file:
                     parts = line.strip().split(",", 3)
                     if len(parts) == 4:
-                        s_id, name, age, subj_json = int(parts[0]), parts[1], int(parts[2]), parts[3]
+                        s_id, name, age, subj_json = parts[0], parts[1], int(parts[2]), parts[3]
                         subjects = json.loads(subj_json)
                         students.append(Student(s_id, name, age, subjects))
         except Exception as e:
@@ -234,14 +233,14 @@ if menu == "➕ Add Student & Marks":
     st.subheader("Register New Student & Subject Marks")
     
     if "suggested_id" not in st.session_state:
-        st.session_state.suggested_id = random.randint(1001, 9999)
+        st.session_state.suggested_id = f"STU{random.randint(101, 999)}"
 
     current_subjects = st.session_state.subjects
     if not current_subjects:
         st.warning("Please add subjects first in the 'Manage Subjects' menu!")
     else:
         with st.form("add_form"):
-            s_id = st.number_input("Student ID", min_value=1, value=st.session_state.suggested_id)
+            s_id = st.text_input("Student ID (Alphanumeric, e.g. STU101)", value=st.session_state.suggested_id)
             name = st.text_input("Full Name")
             age = st.number_input("Age", min_value=17, max_value=100, value=20)
             
@@ -255,14 +254,21 @@ if menu == "➕ Add Student & Marks":
             
             submitted = st.form_submit_button("Save Student Record")
             if submitted:
-                if name.strip() == "":
+                if not s_id.strip():
+                    st.warning("Please enter a valid Student ID.")
+                elif name.strip() == "":
                     st.warning("Please enter a valid student name.")
                 else:
-                    new_student = Student(int(s_id), name, int(age), subject_marks)
-                    st.session_state.students.append(new_student)
-                    save_records(st.session_state.students)
-                    st.success(f"Successfully added record for {name}!")
-                    st.session_state.suggested_id = random.randint(1001, 9999)
+                    # Check for duplicate ID
+                    existing_ids = [s.get_student_id().lower() for s in st.session_state.students]
+                    if s_id.strip().lower() in existing_ids:
+                        st.error(f"Student ID '{s_id}' already exists! Please use a unique ID.")
+                    else:
+                        new_student = Student(s_id.strip(), name.strip(), int(age), subject_marks)
+                        st.session_state.students.append(new_student)
+                        save_records(st.session_state.students)
+                        st.success(f"Successfully added record for {name} with ID {s_id}!")
+                        st.session_state.suggested_id = f"STU{random.randint(101, 999)}"
 
 
 # --- OPTION 2: VIEW RECORDS ---
@@ -341,7 +347,7 @@ elif menu == "📚 Manage Subjects":
         if st.button("Add Subject"):
             if not new_code.strip() or not new_name.strip():
                 st.warning("Both Subject Code and Name are required.")
-            elif new_code.strip() in st.session_state.subjects:
+            elif new_code.strip().upper() in st.session_state.subjects:
                 st.error("Subject Code already exists!")
             else:
                 st.session_state.subjects[new_code.strip().upper()] = new_name.strip()
@@ -400,28 +406,31 @@ elif menu == "👥 Manage Teachers":
 elif menu == "🔍 Search by ID (Linear Search)":
     st.subheader("Search Student Record via Linear Search Algorithm")
     
-    target_id = st.number_input("Enter Student ID to Search", min_value=1, value=1001)
+    target_id = st.text_input("Enter Student ID to Search (e.g. STU101)")
     
     if st.button("Search"):
-        found_student = None
-        for student in st.session_state.students:
-            if student.get_student_id() == target_id:
-                found_student = student
-                break
-        
-        if found_student:
-            st.success("Record Found!")
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Student Name", found_student.get_name())
-            col2.metric("Total Marks", f"{found_student.get_total_marks()} / {len(found_student.get_subjects()) * 100}")
-            col3.metric("Percentage", f"{found_student.get_percentage()}%")
-            
-            st.write("**Subject-wise Breakdown:**")
-            # Display with subject names instead of just codes
-            readable_subjects = {f"[{code}] {st.session_state.subjects.get(code, code)}": mark for code, mark in found_student.get_subjects().items()}
-            st.json(readable_subjects)
+        if not target_id.strip():
+            st.warning("Please enter a Student ID to search.")
         else:
-            st.error("Student with this ID does not exist.")
+            found_student = None
+            # Linear Search Implementation (Unit III) supporting alphanumeric comparison
+            for student in st.session_state.students:
+                if student.get_student_id().strip().lower() == target_id.strip().lower():
+                    found_student = student
+                    break
+            
+            if found_student:
+                st.success("Record Found!")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Student Name", found_student.get_name())
+                col2.metric("Total Marks", f"{found_student.get_total_marks()} / {len(found_student.get_subjects()) * 100}")
+                col3.metric("Percentage", f"{found_student.get_percentage()}%")
+                
+                st.write("**Subject-wise Breakdown:**")
+                readable_subjects = {f"[{code}] {st.session_state.subjects.get(code, code)}": mark for code, mark in found_student.get_subjects().items()}
+                st.json(readable_subjects)
+            else:
+                st.error(f"Student with ID '{target_id}' does not exist.")
 
 
 # --- OPTION 7: FILTER HIGH ACHIEVERS (UNIT IV) ---
